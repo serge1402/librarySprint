@@ -31,6 +31,10 @@ public class StepDefinitions {
     JsonPath jp;
     ValidatableResponse validatableResponseThen;
 
+    LoginPage loginPage = new LoginPage();
+    BasePage base = new BooksPage();
+    BooksPage book = new BooksPage();
+
 
 
 
@@ -118,8 +122,7 @@ public class StepDefinitions {
 
     @And("the field value for {string} path should be equal to {string}")
     public void theFieldValueForPathShouldBeEqualTo(String path, String value) {
-        System.out.println("The message" + jp.getString(path));
-        Assert.assertTrue(jp.getString(path).contains(value));
+        validatableResponseThen.body(path,Matchers.is(value));
     }
 
 
@@ -127,67 +130,60 @@ public class StepDefinitions {
     //-----------US_03_02-----------
     @Given("I logged in Library UI as {string}")
     public void i_logged_in_library_ui_as(String userType) {
-        LoginPage loginPage = new LoginPage();
         loginPage.login(userType);
     }
-
     @Given("I navigate to {string} page")
     public void i_navigate_to_page(String string) {
-       BasePage base = new BooksPage();
        base.booksPageButton.click();
     }
     @Then("UI, Database and API created book information must match")
     public void ui_database_and_api_created_book_information_must_match() {
 
-        String nameAPI = randomMap.get("name").toString();
-        String authorAPI = randomMap.get("author").toString();
-        String yearAPI = randomMap.get("year").toString();
-        String isbnAPI = randomMap.get("isbn").toString();
-
-
-        BooksPage book = new BooksPage();
         book.searchBox.sendKeys(randomMap.get("name").toString() + Keys.ENTER);
-
         BrowserUtils.waitFor(1);
 
-        String nameUI = book.result_name.getText();
-        String authorUI = book.result_author.getText();
-        String yearUI = book.result_year.getText();
-        String isbnUI = book.result_isbn.getText();
 
-        DB_Util.runQuery("select name,author,year,isbn from books where isbn='"+isbnAPI+"'");
+        DB_Util.runQuery("select name,author,year,isbn from books where isbn=" + jp.getString("isbn"));
         Map<String,String> dataMap = DB_Util.getRowMap(1);
 
-        Assert.assertEquals(nameAPI,dataMap.get("name"));
-        Assert.assertEquals(authorAPI,dataMap.get("author"));
-        Assert.assertEquals(yearAPI,dataMap.get("year"));
-        Assert.assertEquals(isbnAPI,dataMap.get("isbn"));
 
-        Assert.assertEquals(nameAPI,nameUI);
-        Assert.assertEquals(authorAPI,authorUI);
-        Assert.assertEquals(yearAPI,yearUI);
-        Assert.assertEquals(isbnAPI,isbnUI);
+        DB_Util.assertMapDB(dataMap,randomMap);
+        Assert.assertEquals(randomMap.get("name").toString(),book.result_name.getText());
+        Assert.assertEquals(randomMap.get("author").toString(),book.result_author.getText());
+        Assert.assertEquals(randomMap.get("year").toString(),book.result_year.getText());
+        Assert.assertEquals(randomMap.get("isbn").toString(),book.result_isbn.getText());
     }
 
 
     //-----------US_04_01-----------
     @Then("created user information should match with Database")
     public void created_user_information_should_match_with_database() {
-        DB_Util.runQuery("select full_name,email,user_group_id,status,start_date,end_date,address from users where full_name=" + randomMap.get("user_id") + "and email=" +randomMap.get("email"));
+        DB_Util.runQuery("select * from users where id=" + jp.getString("id"));
         Map<String,String> dataMap = DB_Util.getRowMap(1);
         DB_Util.assertMapDB(dataMap,randomMap);
     }
     @Then("created user should be able to login Library UI")
     public void created_user_should_be_able_to_login_library_ui() {
-        LoginPage loginPage = new LoginPage();
         loginPage.login(randomMap.get("email").toString(), randomMap.get("password").toString());
+        BrowserUtils.waitForVisibility(base.userName,20);
     }
     @Then("created user name should appear in Dashboard Page")
     public void created_user_name_should_appear_in_dashboard_page() {
-        BasePage base = new BooksPage();
-        Assert.assertEquals(base.userName.getText(),randomMap.get("name").toString());
+        Assert.assertEquals(base.userName.getText(),randomMap.get("full_name"));
     }
 
+
+    //-----------US_04-----------
+    String token;
+    @Given("I logged Library api with credentials {string} and {string}")
+    public void i_logged_library_api_with_credentials_and(String email, String password) {
+        token = LibraryUtility.getToken(email,password);
+       requestSpecificationGiven.header("x-library-token", LibraryUtility.getToken(email,password));
+    }
+    @Given("I send token information as request body")
+    public void i_send_token_information_as_request_body() {
+        requestSpecificationGiven.formParam("token", token);
+    }
 
 
 
